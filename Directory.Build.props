@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <OtherFlags>$(OtherFlags) --nowarn:3390</OtherFlags>
+  </PropertyGroup>
+</Project>

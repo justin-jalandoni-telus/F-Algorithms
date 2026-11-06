@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Types.fs" />
+    <Compile Include="Graph.fs" />
+    <Compile Include="AdjacencyList.fs" />
+    <Compile Include="AdjacencyMatrix.fs" />
+    <Compile Include="Traversal.fs" />
+    <Compile Include="ShortestPath.fs" />
+    <Compile Include="Mst.fs" />
+    <Compile Include="MaxFlow.fs" />
+    <Compile Include="BipartiteMatching.fs" />
+    <Compile Include="GeneralMatching.fs" />
+    <Compile Include="Hash.fs" />
+    <Compile Include="BloomFilter.fs" />
+    <Compile Include="HyperLogLog.fs" />
+    <Compile Include="CountMinSketch.fs" />
+    <Compile Include="Monads.fs" />
+    <Compile Include="BinaryTree.fs" />
+    <Compile Include="BinarySearchTree.fs" />
+    <Compile Include="AvlTree.fs" />
+    <Compile Include="RedBlackTree.fs" />
+    <Compile Include="BTree.fs" />
+  </ItemGroup>
+
+</Project>

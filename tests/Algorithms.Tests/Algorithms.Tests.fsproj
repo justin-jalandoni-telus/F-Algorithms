@@ -1,0 +1,41 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <GenerateProgramFile>false</GenerateProgramFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="GraphTests.fs" />
+    <Compile Include="AdjacencyListTests.fs" />
+    <Compile Include="AdjacencyMatrixTests.fs" />
+    <Compile Include="TraversalTests.fs" />
+    <Compile Include="ShortestPathTests.fs" />
+    <Compile Include="MstTests.fs" />
+    <Compile Include="MaxFlowTests.fs" />
+    <Compile Include="MatchingTests.fs" />
+    <Compile Include="BloomFilterTests.fs" />
+    <Compile Include="HyperLogLogTests.fs" />
+    <Compile Include="CountMinSketchTests.fs" />
+    <Compile Include="MonadTests.fs" />
+    <Compile Include="BinaryTreeTests.fs" />
+    <Compile Include="BinarySearchTreeTests.fs" />
+    <Compile Include="AvlTreeTests.fs" />
+    <Compile Include="RedBlackTreeTests.fs" />
+    <Compile Include="BTreeTests.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="FsUnit.xUnit" Version="6.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Algorithms\Algorithms.fsproj" />
+  </ItemGroup>
+
+</Project>

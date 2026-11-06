@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Stream.fs" />
+    <Compile Include="BatchedQueue.fs" />
+    <Compile Include="BankersQueue.fs" />
+    <Compile Include="PhysicistsQueue.fs" />
+    <Compile Include="RealTimeQueue.fs" />
+    <Compile Include="BankersDeque.fs" />
+    <Compile Include="LeftistHeap.fs" />
+    <Compile Include="BinomialHeap.fs" />
+    <Compile Include="PairingHeap.fs" />
+    <Compile Include="SplayHeap.fs" />
+    <Compile Include="BinaryRandomAccessList.fs" />
+    <Compile Include="SkewBinaryRandomAccessList.fs" />
+  </ItemGroup>
+
+</Project>
