@@ -196,3 +196,229 @@ module ResultM =
         | _, Error e -> Error e
     /// Monadic bind.
     let bind = Result.bind
+
+
+/// The Either monad: a value that is either <c>Left</c> (by convention an
+/// error) or <c>Right</c> (by convention a success). A richer, explicitly
+/// two-sided alternative to <see cref="Result{T, E}"/>, ported from the
+/// <c>Either&lt;L, R&gt;</c> type in Enrico Buonanno's <i>Functional
+/// Programming in C#</i>.
+type Either<'L, 'R> =
+    | Left of 'L
+    | Right of 'R
+
+[<RequireQualifiedAccess>]
+module Either =
+    /// Lifts a value into the <c>Right</c> (success) case.
+    let retn value = Right value
+
+    /// Case analysis: applies <paramref name="onLeft"/> to a <c>Left</c> or
+    /// <paramref name="onRight"/> to a <c>Right</c>.
+    let either onLeft onRight =
+        function
+        | Left l -> onLeft l
+        | Right r -> onRight r
+
+    /// Functor map over the <c>Right</c> value; a <c>Left</c> passes through.
+    let map f =
+        function
+        | Left l -> Left l
+        | Right r -> Right(f r)
+
+    /// Maps over the <c>Left</c> value only.
+    let mapLeft f =
+        function
+        | Left l -> Left(f l)
+        | Right r -> Right r
+
+    /// Bifunctor map: transforms whichever side is present.
+    let bimap onLeft onRight =
+        function
+        | Left l -> Left(onLeft l)
+        | Right r -> Right(onRight r)
+
+    /// Monadic bind over the <c>Right</c> value; a <c>Left</c> short-circuits.
+    let bind f =
+        function
+        | Left l -> Left l
+        | Right r -> f r
+
+    /// Applicative apply; the first <c>Left</c> encountered short-circuits.
+    let apply fEither xEither =
+        match fEither, xEither with
+        | Left l, _ -> Left l
+        | Right f, Right x -> Right(f x)
+        | Right _, Left l -> Left l
+
+    /// The <c>Right</c> value, or <paramref name="fallback"/> when <c>Left</c>.
+    let defaultValue fallback =
+        function
+        | Right r -> r
+        | Left _ -> fallback
+
+    /// The <c>Right</c> value, or <paramref name="fallback"/> applied to the
+    /// <c>Left</c>.
+    let defaultWith fallback =
+        function
+        | Right r -> r
+        | Left l -> fallback l
+
+    /// Converts to a <see cref="Result{R, L}"/> (<c>Right</c> to <c>Ok</c>,
+    /// <c>Left</c> to <c>Error</c>).
+    let toResult =
+        function
+        | Right r -> Ok r
+        | Left l -> Error l
+
+    /// Converts a <see cref="Result{T, E}"/> (<c>Ok</c> to <c>Right</c>,
+    /// <c>Error</c> to <c>Left</c>).
+    let ofResult =
+        function
+        | Ok r -> Right r
+        | Error e -> Left e
+
+    /// Converts to an option, discarding any <c>Left</c>.
+    let toOption =
+        function
+        | Right r -> Some r
+        | Left _ -> None
+
+/// Computation-expression builder for <see cref="Either{L, R}"/>.
+type EitherBuilder() =
+    member _.Return(x) = Either.retn x
+    member _.ReturnFrom(m: Either<'L, 'R>) = m
+    member _.Bind(m, f) = Either.bind f m
+
+[<AutoOpen>]
+module EitherExpression =
+    /// Builds short-circuiting <c>Left</c>/<c>Right</c> computations.
+    let either = EitherBuilder()
+
+
+/// A domain error carrying a human-readable message. Mirrors the <c>Error</c>
+/// type accumulated by <see cref="Validation{T}"/> in <i>Functional Programming
+/// in C#</i>.
+type ValidationError =
+    { Message: string }
+    override this.ToString() = this.Message
+
+[<RequireQualifiedAccess>]
+module ValidationError =
+    /// Creates an error from a message.
+    let create message = { Message = message }
+
+/// The Validation applicative: either <c>Valid</c> with a value or
+/// <c>Invalid</c> with accumulated errors. Unlike <see cref="Result{T, E}"/>
+/// and <see cref="Either{L, R}"/>, <see cref="Validation.apply"/> collects the
+/// errors from <em>every</em> operand rather than stopping at the first, which
+/// is what makes it ideal for form/record validation. Ported from the
+/// <c>Validation&lt;T&gt;</c> type in <i>Functional Programming in C#</i>.
+type Validation<'T> =
+    | Valid of 'T
+    | Invalid of ValidationError list
+
+[<RequireQualifiedAccess>]
+module Validation =
+    /// Lifts a value into the <c>Valid</c> case.
+    let retn value = Valid value
+
+    /// Creates an <c>Invalid</c> from a list of errors.
+    let fail errors = Invalid errors
+
+    /// Creates an <c>Invalid</c> from a single error message.
+    let failWith message = Invalid [ ValidationError.create message ]
+
+    /// Case analysis: applies <paramref name="onInvalid"/> to the errors or
+    /// <paramref name="onValid"/> to the value.
+    let validation onInvalid onValid =
+        function
+        | Invalid errors -> onInvalid errors
+        | Valid value -> onValid value
+
+    /// Functor map over the <c>Valid</c> value; errors pass through.
+    let map f =
+        function
+        | Valid value -> Valid(f value)
+        | Invalid errors -> Invalid errors
+
+    /// Monadic bind; an <c>Invalid</c> short-circuits, so errors are <em>not</em>
+    /// accumulated. Use <see cref="Validation.apply"/> to gather all errors.
+    let bind f =
+        function
+        | Valid value -> f value
+        | Invalid errors -> Invalid errors
+
+    /// Applicative apply that <em>accumulates</em> the errors of both operands.
+    let apply fVal xVal =
+        match fVal, xVal with
+        | Valid f, Valid x -> Valid(f x)
+        | Invalid e, Valid _ -> Invalid e
+        | Valid _, Invalid e -> Invalid e
+        | Invalid e1, Invalid e2 -> Invalid(e1 @ e2)
+
+    /// Combines two validations with <paramref name="f"/>, accumulating errors.
+    let map2 f v1 v2 = apply (map f v1) v2
+
+    /// Combines three validations with <paramref name="f"/>, accumulating errors.
+    let map3 f v1 v2 v3 = apply (apply (map f v1) v2) v3
+
+    /// The <c>Valid</c> value, or <paramref name="fallback"/> when <c>Invalid</c>.
+    let defaultValue fallback =
+        function
+        | Valid value -> value
+        | Invalid _ -> fallback
+
+    /// The <c>Valid</c> value, or <paramref name="fallback"/> applied to the
+    /// accumulated errors.
+    let defaultWith fallback =
+        function
+        | Valid value -> value
+        | Invalid errors -> fallback errors
+
+    /// Converts to a <see cref="Result{T, E}"/> carrying the error list.
+    let toResult =
+        function
+        | Valid value -> Ok value
+        | Invalid errors -> Error errors
+
+    /// Converts to an option, discarding any errors.
+    let toOption =
+        function
+        | Valid value -> Some value
+        | Invalid _ -> None
+
+/// Computation-expression builder for <see cref="Validation{T}"/>. The builder
+/// is monadic and therefore short-circuits; use <see cref="Validation.apply"/>
+/// or <see cref="Validation.map2"/> to accumulate errors.
+type ValidationBuilder() =
+    member _.Return(x) = Validation.retn x
+    member _.ReturnFrom(m: Validation<'T>) = m
+    member _.Bind(m, f) = Validation.bind f m
+
+[<AutoOpen>]
+module ValidationExpression =
+    /// Builds short-circuiting validation computations.
+    let validation = ValidationBuilder()
+
+
+/// The Identity monad: the simplest possible monad, wrapping a value with no
+/// added effect. Mirrors the <c>Identity&lt;T&gt;</c> type in <i>Functional
+/// Programming in C#</i>; chiefly useful as a building block and teaching aid.
+type Identity<'T> = Identity of 'T
+
+[<RequireQualifiedAccess>]
+module Identity =
+    /// Unwraps the contained value.
+    let run (Identity value) = value
+
+    /// Lifts a value into the identity context.
+    let retn value = Identity value
+
+    /// Functor map over the contained value.
+    let map f (Identity value) = Identity(f value)
+
+    /// Monadic bind over the contained value.
+    let bind f (Identity value) = f value
+
+    /// Applicative apply.
+    let apply (Identity f) (Identity x) = Identity(f x)

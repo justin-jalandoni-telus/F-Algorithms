@@ -73,9 +73,12 @@ BloomFilter.mightContain "world" filter   // false (definitely absent)
 ```
 
 ### Functional abstractions
-[`Monads`](src/Algorithms/Monads.fs) provides `Try`, `Reader`, and `State`
-monads (each with a computation expression), plus Functor/Applicative/Monad
-helpers for the built-in `Option` and `Result` types.
+[`Monads`](src/Algorithms/Monads.fs) provides `Try`, `Reader`, `State`,
+`Either`, `Validation`, and `Identity` monads (each with a computation
+expression where it makes sense), plus Functor/Applicative/Monad helpers for the
+built-in `Option` and `Result` types. The `Either`, `Validation`, and `Identity`
+types are ported from Enrico Buonanno's *Functional Programming in C#*
+([la-yumba/functional-csharp-code](https://github.com/la-yumba/functional-csharp-code)).
 
 ```fsharp
 let parsed =
@@ -85,6 +88,17 @@ let parsed =
         return a + b
     }
 parsed |> Try.toOption   // Some 42
+```
+
+Unlike `Result`/`Either`, which stop at the first error, `Validation.apply`
+*accumulates* every error — ideal for validating several fields at once:
+
+```fsharp
+let add a b = a + b
+
+Validation.map2 add (Validation.failWith "name required")
+                    (Validation.failWith "age required")
+// Invalid [ { Message = "name required" }; { Message = "age required" } ]
 ```
 
 ### Trees
@@ -134,7 +148,7 @@ BankersQueue.head q                      // 1
   absent (`BellmanFordResult`, `Try`, `option`).
 - **Qualified module access** so call sites read as `Graph.addEdge`,
   `ShortestPath.dijkstra`, `BinomialHeap.insert`.
-- **Tested behaviour.** 111 unit tests (xUnit + FsUnit) cover the public API and,
+- **Tested behaviour.** 120 unit tests (xUnit + FsUnit) cover the public API and,
   for the balanced trees and B-trees, assert the structural invariants.
 
 ## Project layout
