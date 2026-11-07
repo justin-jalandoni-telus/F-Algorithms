@@ -74,9 +74,12 @@ BloomFilter.mightContain "world" filter   // false (definitely absent)
 
 ### Functional abstractions
 [`Monads`](src/Algorithms/Monads.fs) provides `Try`, `Reader`, `State`,
-`Either`, `Validation`, and `Identity` monads (each with a computation
-expression where it makes sense), plus Functor/Applicative/Monad helpers for the
-built-in `Option` and `Result` types. The `Either`, `Validation`, and `Identity`
+`Either`, `Validation`, `Identity`, and `Exceptional` types (each with a
+computation expression where it makes sense), plus Functor/Applicative/Monad
+helpers for the built-in `Option` and `Result` types. Every type exposes a
+consistent `map`/`retn`/`apply`/`bind` surface, applicative lifting
+(`map2`/`map3`), and — for `Option`, `Result`, and `Validation` —
+`traverse`/`sequence`. The `Either`, `Validation`, `Identity`, and `Exceptional`
 types are ported from Enrico Buonanno's *Functional Programming in C#*
 ([la-yumba/functional-csharp-code](https://github.com/la-yumba/functional-csharp-code)).
 
@@ -90,8 +93,9 @@ let parsed =
 parsed |> Try.toOption   // Some 42
 ```
 
-Unlike `Result`/`Either`, which stop at the first error, `Validation.apply`
-*accumulates* every error — ideal for validating several fields at once:
+Unlike `Result`/`Either`, which stop at the first error, the `Validation`
+applicative *accumulates* every error — ideal for validating several fields, or
+a whole list, at once. `traverse` lifts an element-wise check over a list:
 
 ```fsharp
 let add a b = a + b
@@ -99,6 +103,16 @@ let add a b = a + b
 Validation.map2 add (Validation.failWith "name required")
                     (Validation.failWith "age required")
 // Invalid [ { Message = "name required" }; { Message = "age required" } ]
+
+let evenOnly x =
+    if x % 2 = 0 then Valid x else Validation.failWith $"odd {x}"
+
+[ 1; 2; 3 ] |> Validation.traverse evenOnly
+// Invalid [ { Message = "odd 1" }; { Message = "odd 3" } ]
+
+// Monadic traverse/sequence short-circuit instead:
+[ Some 1; Some 2; Some 3 ] |> OptionM.sequence   // Some [1; 2; 3]
+[ Some 1; None;   Some 3 ] |> OptionM.sequence   // None
 ```
 
 ### Trees
@@ -148,7 +162,7 @@ BankersQueue.head q                      // 1
   absent (`BellmanFordResult`, `Try`, `option`).
 - **Qualified module access** so call sites read as `Graph.addEdge`,
   `ShortestPath.dijkstra`, `BinomialHeap.insert`.
-- **Tested behaviour.** 120 unit tests (xUnit + FsUnit) cover the public API and,
+- **Tested behaviour.** 131 unit tests (xUnit + FsUnit) cover the public API and,
   for the balanced trees and B-trees, assert the structural invariants.
 
 ## Project layout

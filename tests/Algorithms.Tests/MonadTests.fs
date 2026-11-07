@@ -157,3 +157,86 @@ let ``identity bind threads the wrapped value`` () =
     |> Identity.map (fun x -> x * 2)
     |> Identity.run
     |> should equal 42
+
+[<Fact>]
+let ``option map2 combines two options`` () =
+    let add a b = a + b
+    OptionM.map2 add (Some 2) (Some 3) |> should equal (Some 5)
+    OptionM.map2 add (Some 2) None |> should equal (None: int option)
+
+[<Fact>]
+let ``option traverse collects values when all are present`` () =
+    [ 1; 2; 3 ]
+    |> OptionM.traverse (fun x -> Some(x * 2))
+    |> should equal (Some [ 2; 4; 6 ])
+
+[<Fact>]
+let ``option traverse yields none when any element is missing`` () =
+    [ 1; -2; 3 ]
+    |> OptionM.traverse (fun x -> if x > 0 then Some x else None)
+    |> should equal (None: int list option)
+
+[<Fact>]
+let ``option sequence inverts the list and option layers`` () =
+    [ Some 1; Some 2; Some 3 ] |> OptionM.sequence |> should equal (Some [ 1; 2; 3 ])
+    [ Some 1; None; Some 3 ] |> OptionM.sequence |> should equal (None: int list option)
+
+[<Fact>]
+let ``result traverse returns the first error`` () =
+    let checkNonNeg x =
+        if x >= 0 then Ok x else Error $"neg {x}"
+
+    [ 1; -2; -3 ]
+    |> ResultM.traverse checkNonNeg
+    |> should equal (Error "neg -2": Result<int list, string>)
+
+[<Fact>]
+let ``result sequence collects the ok values`` () =
+    ([ Ok 1; Ok 2; Ok 3 ]: Result<int, string> list)
+    |> ResultM.sequence
+    |> should equal (Ok [ 1; 2; 3 ]: Result<int list, string>)
+
+[<Fact>]
+let ``validation traverse accumulates every error`` () =
+    let evenOnly x =
+        if x % 2 = 0 then Valid x else Validation.failWith $"odd {x}"
+
+    [ 1; 2; 3 ]
+    |> Validation.traverse evenOnly
+    |> should
+        equal
+        (Invalid [ ValidationError.create "odd 1"; ValidationError.create "odd 3" ]: Validation<int list>)
+
+[<Fact>]
+let ``either map2 short-circuits on the first left`` () =
+    let add a b = a + b
+    Either.map2 add (Right 2: Either<string, int>) (Right 3) |> should equal (Right 5: Either<string, int>)
+    Either.map2 add (Left "bad") (Right 3) |> should equal (Left "bad": Either<string, int>)
+
+[<Fact>]
+let ``exceptional run captures exceptions`` () =
+    match Exceptional.run (fun () -> 1 / 0) with
+    | Exceptional.Exception _ -> ()
+    | Exceptional.Success _ -> failwith "expected an exception"
+
+[<Fact>]
+let ``exceptional threads successes through the builder`` () =
+    let computation =
+        exceptional {
+            let! a = Exceptional.run (fun () -> 10)
+            let! b = Exceptional.run (fun () -> 32)
+            return a + b
+        }
+
+    computation |> Exceptional.toOption |> should equal (Some 42)
+
+[<Fact>]
+let ``exceptional bind short-circuits on exception`` () =
+    let computation =
+        exceptional {
+            let! a = Exceptional.run (fun () -> 10)
+            let! b = Exceptional.run (fun () -> 1 / 0)
+            return a + b
+        }
+
+    computation |> Exceptional.toOption |> should equal (None: int option)

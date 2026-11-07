@@ -36,6 +36,12 @@ module Try =
         | Failure e, _ -> Failure e
         | _, Failure e -> Failure e
 
+    /// Applicative lift of a binary function over two computations.
+    let map2 f a b = apply (map f a) b
+
+    /// Applicative lift of a ternary function over three computations.
+    let map3 f a b c = apply (apply (map f a) b) c
+
     /// Replaces a failure with the result of <paramref name="handler"/>.
     let recover handler =
         function
@@ -177,6 +183,16 @@ module OptionM =
         | _ -> None
     /// Monadic bind.
     let bind = Option.bind
+    /// Applicative lift of a binary function over two options.
+    let map2 f a b = apply (map f a) b
+    /// Applicative lift of a ternary function over three options.
+    let map3 f a b c = apply (apply (map f a) b) c
+    /// Applies <paramref name="f"/> to each element, collecting the results
+    /// when all are <c>Some</c>; yields <c>None</c> if any is <c>None</c>.
+    let traverse f list =
+        List.foldBack (fun x state -> map2 (fun y ys -> y :: ys) (f x) state) list (Some [])
+    /// Turns a list of options into an option of the list of their values.
+    let sequence list = traverse id list
 
 
 /// Functor / applicative / monad helpers for <see cref="Result{T, E}"/>.
@@ -196,6 +212,16 @@ module ResultM =
         | _, Error e -> Error e
     /// Monadic bind.
     let bind = Result.bind
+    /// Applicative lift of a binary function, returning the first error.
+    let map2 f a b = apply (map f a) b
+    /// Applicative lift of a ternary function, returning the first error.
+    let map3 f a b c = apply (apply (map f a) b) c
+    /// Applies <paramref name="f"/> to each element, collecting the results
+    /// when all are <c>Ok</c>; yields the first <c>Error</c> otherwise.
+    let traverse f list =
+        List.foldBack (fun x state -> map2 (fun y ys -> y :: ys) (f x) state) list (Ok [])
+    /// Turns a list of results into a result of the list of their values.
+    let sequence list = traverse id list
 
 
 /// The Either monad: a value that is either <c>Left</c> (by convention an
@@ -249,6 +275,12 @@ module Either =
         | Left l, _ -> Left l
         | Right f, Right x -> Right(f x)
         | Right _, Left l -> Left l
+
+    /// Applicative lift of a binary function; the first <c>Left</c> short-circuits.
+    let map2 f a b = apply (map f a) b
+
+    /// Applicative lift of a ternary function; the first <c>Left</c> short-circuits.
+    let map3 f a b c = apply (apply (map f a) b) c
 
     /// The <c>Right</c> value, or <paramref name="fallback"/> when <c>Left</c>.
     let defaultValue fallback =
@@ -362,6 +394,15 @@ module Validation =
     /// Combines three validations with <paramref name="f"/>, accumulating errors.
     let map3 f v1 v2 v3 = apply (apply (map f v1) v2) v3
 
+    /// Applies <paramref name="f"/> to each element, collecting the values when
+    /// all are <c>Valid</c> and <em>accumulating every error</em> otherwise.
+    let traverse f list =
+        List.foldBack (fun x state -> map2 (fun y ys -> y :: ys) (f x) state) list (Valid [])
+
+    /// Turns a list of validations into a validation of the list, accumulating
+    /// all errors.
+    let sequence list = traverse id list
+
     /// The <c>Valid</c> value, or <paramref name="fallback"/> when <c>Invalid</c>.
     let defaultValue fallback =
         function
@@ -422,3 +463,87 @@ module Identity =
 
     /// Applicative apply.
     let apply (Identity f) (Identity x) = Identity(f x)
+
+
+/// A computation result that already holds either a value or the exception
+/// raised while producing it - the eager sibling of the deferred
+/// <see cref="Try{T}"/>. Ported from the <c>Exceptional&lt;T&gt;</c> type in
+/// <i>Functional Programming in C#</i>.
+[<RequireQualifiedAccess>]
+type Exceptional<'T> =
+    | Success of 'T
+    | Exception of exn
+
+[<RequireQualifiedAccess>]
+module Exceptional =
+    /// Lifts a value into a successful result.
+    let retn value = Exceptional.Success value
+
+    /// Wraps an exception as a faulted result.
+    let ofException (ex: exn) : Exceptional<'T> = Exceptional.Exception ex
+
+    /// Runs <paramref name="operation"/>, capturing any exception as a fault.
+    let run operation =
+        try Exceptional.Success(operation ())
+        with ex -> Exceptional.Exception ex
+
+    /// Case analysis: applies <paramref name="onException"/> to a fault or
+    /// <paramref name="onSuccess"/> to a value.
+    let exceptional onException onSuccess =
+        function
+        | Exceptional.Success value -> onSuccess value
+        | Exceptional.Exception ex -> onException ex
+
+    /// Functor map over the value; a captured exception passes through.
+    let map f =
+        function
+        | Exceptional.Success value -> Exceptional.Success(f value)
+        | Exceptional.Exception ex -> Exceptional.Exception ex
+
+    /// Monadic bind; a captured exception short-circuits.
+    let bind f =
+        function
+        | Exceptional.Success value -> f value
+        | Exceptional.Exception ex -> Exceptional.Exception ex
+
+    /// Applicative apply; the first exception short-circuits.
+    let apply fExc xExc =
+        match fExc, xExc with
+        | Exceptional.Success f, Exceptional.Success x -> Exceptional.Success(f x)
+        | Exceptional.Exception ex, _ -> Exceptional.Exception ex
+        | _, Exceptional.Exception ex -> Exceptional.Exception ex
+
+    /// Applicative lift of a binary function over two computations.
+    let map2 f a b = apply (map f a) b
+
+    /// Applicative lift of a ternary function over three computations.
+    let map3 f a b c = apply (apply (map f a) b) c
+
+    /// The value, or <paramref name="fallback"/> on exception.
+    let defaultValue fallback =
+        function
+        | Exceptional.Success value -> value
+        | Exceptional.Exception _ -> fallback
+
+    /// Converts to a <see cref="Result{T, E}"/>.
+    let toResult =
+        function
+        | Exceptional.Success value -> Ok value
+        | Exceptional.Exception ex -> Error ex
+
+    /// Converts to an option, discarding the exception.
+    let toOption =
+        function
+        | Exceptional.Success value -> Some value
+        | Exceptional.Exception _ -> None
+
+/// Computation-expression builder for <see cref="Exceptional{T}"/>.
+type ExceptionalBuilder() =
+    member _.Return(x) = Exceptional.retn x
+    member _.ReturnFrom(m: Exceptional<'T>) = m
+    member _.Bind(m, f) = Exceptional.bind f m
+
+[<AutoOpen>]
+module ExceptionalExpression =
+    /// Builds exception-capturing computations over already-evaluated results.
+    let exceptional = ExceptionalBuilder()
